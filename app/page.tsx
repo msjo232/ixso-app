@@ -1582,7 +1582,10 @@ function MyPage(props: {
           포인트 충전 및 차감은 관리자 확인 후 반영됩니다.
         </p>
 
-        <button className="mt-5 w-full rounded-[20px] bg-[#c85b70] py-4 text-[16px] font-extrabold text-white shadow-sm">
+        <button
+          type="button"
+          className="mt-5 w-full rounded-[20px] bg-[#c85b70] py-4 text-[16px] font-extrabold text-white shadow-sm"
+        >
           포인트 충전 요청
         </button>
       </section>
