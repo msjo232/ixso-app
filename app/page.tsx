@@ -125,6 +125,19 @@ function getPaymentStatusLabel(status?: string | null) {
   if (status === 'rejected') return '취소'
   return '확인대기'
 }
+function formatPointDateTime(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 function getPointTypeLabel(type?: string | null) {
   if (type === 'charge') return '충전'
   if (type === 'use') return '차감'
@@ -140,19 +153,6 @@ function formatPointDate(value?: string | null) {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-  })
-}
-
-function formatPointDateTime(value?: string | null) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   })
 }
 
@@ -1329,6 +1329,7 @@ function PointHistoryModal(props: {
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="rounded-full bg-[#f1efec] px-4 py-2 text-[13px] font-extrabold text-[#555]"
           >
@@ -1338,6 +1339,7 @@ function PointHistoryModal(props: {
 
         <div className="max-h-[62vh] overflow-y-auto px-5 py-4">
           <button
+            type="button"
             onClick={onRefresh}
             className="mb-3 w-full rounded-2xl bg-[#f1efec] py-3 text-[13px] font-extrabold text-[#555]"
           >
@@ -1435,6 +1437,7 @@ function PasswordChangeModal(props: {
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="rounded-full bg-[#f1efec] px-4 py-2 text-[13px] font-extrabold text-[#555]"
           >
@@ -1460,6 +1463,7 @@ function PasswordChangeModal(props: {
         </div>
 
         <button
+          type="button"
           onClick={onChangePassword}
           disabled={passwordChanging}
           className="mt-5 w-full rounded-[20px] bg-[#252525] py-4 text-[15px] font-extrabold text-white disabled:opacity-60"
@@ -1474,10 +1478,9 @@ function PasswordChangeModal(props: {
 function MyPage(props: {
   member: Member
   setCurrentMember: (member: Member | null) => void
-  openAdminPage: () => void
+  setShowAdminPage: (value: boolean) => void
 }) {
-  const { member, setCurrentMember, openAdminPage } = props
-  const isAdmin = member.role === 'admin'
+  const { member, setCurrentMember, setShowAdminPage } = props
   const [myBalance, setMyBalance] = useState(0)
   const [myTransactions, setMyTransactions] = useState<PointTransaction[]>([])
   const [isPointHistoryOpen, setIsPointHistoryOpen] = useState(false)
@@ -1552,6 +1555,181 @@ function MyPage(props: {
 
   return (
     <div className="space-y-5">
+      <section>
+        <p className="text-[22px] font-extrabold">나의 익쏘</p>
+        <p className="mt-1 text-[14px] text-[#777]">
+          포인트와 회원 정보를 확인합니다.
+        </p>
+      </section>
+
+      <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
+        <p className="text-[15px] font-bold">익쏘 pay</p>
+
+        <div className="mt-6 flex items-end justify-between gap-3">
+          <p className="text-[36px] font-extrabold text-[#c85b70]">
+            {myBalance.toLocaleString()}P
+          </p>
+          <button
+            type="button"
+            onClick={() => setIsPointHistoryOpen(true)}
+            className="mb-1 rounded-full bg-[#f1efec] px-4 py-2 text-[13px] font-extrabold text-[#555]"
+          >
+            내역 보기
+          </button>
+        </div>
+
+        <p className="mt-4 text-[13px] text-[#777]">
+          포인트 충전 및 차감은 관리자 확인 후 반영됩니다.
+        </p>
+
+        <button className="mt-5 w-full rounded-[20px] bg-[#c85b70] py-4 text-[16px] font-extrabold text-white shadow-sm">
+          포인트 충전 요청
+        </button>
+      </section>
+
+      {member.role === 'admin' && (
+        <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
+          <p className="text-[15px] font-bold">관리자</p>
+          <button
+            type="button"
+            onClick={() => setShowAdminPage(true)}
+            className="mt-4 w-full rounded-[20px] bg-[#252525] py-4 text-[15px] font-extrabold text-white"
+          >
+            관리자 페이지 접속
+          </button>
+        </section>
+      )}
+
+      <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
+        <p className="text-[15px] font-bold">계정 설정</p>
+        <button
+          type="button"
+          onClick={() => setIsPasswordModalOpen(true)}
+          className="mt-4 w-full rounded-[20px] bg-[#252525] py-4 text-[15px] font-extrabold text-white"
+        >
+          비밀번호 변경
+        </button>
+      </section>
+
+      <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
+        <p className="text-[15px] font-bold">회원 정보</p>
+        <div className="mt-4 rounded-2xl bg-[#f7f5f2] p-4">
+          <p className="text-[13px] font-bold text-[#777]">닉네임</p>
+          <p className="mt-1 text-[18px] font-extrabold">
+            {member.nickname} {member.role === 'admin' ? '👑' : ''}
+          </p>
+        </div>
+        <div className="mt-3 rounded-2xl bg-[#f7f5f2] p-4">
+          <p className="text-[13px] font-bold text-[#777]">아이디</p>
+          <p className="mt-1 text-[16px] font-extrabold">{member.login_id || '-'}</p>
+        </div>
+      </section>
+
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="w-full rounded-[20px] bg-[#f1efec] py-4 text-[15px] font-extrabold text-[#555]"
+      >
+        로그아웃
+      </button>
+
+      <PointHistoryModal
+        isOpen={isPointHistoryOpen}
+        transactions={myTransactions}
+        onClose={() => setIsPointHistoryOpen(false)}
+        onRefresh={fetchMyTransactions}
+      />
+
+      <PasswordChangeModal
+        isOpen={isPasswordModalOpen}
+        newPassword={newPassword}
+        newPasswordConfirm={newPasswordConfirm}
+        passwordChanging={passwordChanging}
+        setNewPassword={setNewPassword}
+        setNewPasswordConfirm={setNewPasswordConfirm}
+        onClose={() => {
+          setIsPasswordModalOpen(false)
+          setNewPassword('')
+          setNewPasswordConfirm('')
+        }}
+        onChangePassword={changeMyPassword}
+      />
+    </div>
+  )
+}) {
+  const { member, setCurrentMember, openAdminPage } = props
+  const isAdmin = member.role === 'admin'
+  const [myBalance, setMyBalance] = useState(0)
+  const [myTransactions, setMyTransactions] = useState<PointTransaction[]>([])
+  const [newPassword, setNewPassword] = useState('')
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
+  const [passwordChanging, setPasswordChanging] = useState(false)
+
+  useEffect(() => {
+    fetchMyPoint()
+    fetchMyTransactions()
+  }, [member.id])
+
+  async function fetchMyPoint() {
+    const { data } = await supabase
+      .from('member_points')
+      .select('current_balance')
+      .eq('member_id', member.id)
+      .maybeSingle()
+
+    setMyBalance(data?.current_balance ?? 0)
+  }
+
+  async function fetchMyTransactions() {
+    const { data, error } = await supabase
+      .from('point_transactions')
+      .select('id, member_id, type, amount, description, event_type, related_attendance_id, attend_date_snapshot, created_at')
+      .eq('member_id', member.id)
+      .order('created_at', { ascending: false })
+      .limit(30)
+
+    if (!error && data) {
+      setMyTransactions(data)
+    }
+  }
+
+  async function changeMyPassword() {
+    if (newPassword.length < 6) {
+      alert('새 비밀번호는 6자 이상으로 입력해주세요.')
+      return
+    }
+
+    if (newPassword !== newPasswordConfirm) {
+      alert('새 비밀번호가 서로 다릅니다.')
+      return
+    }
+
+    setPasswordChanging(true)
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
+
+    setPasswordChanging(false)
+
+    if (error) {
+      console.error(error)
+      alert('비밀번호 변경에 실패했습니다.')
+      return
+    }
+
+    setNewPassword('')
+    setNewPasswordConfirm('')
+    alert('비밀번호를 변경했습니다.')
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    setCurrentMember(null)
+  }
+
+  return (
+    <div className="space-y-5">
       <section className="pt-2">
         <p className="text-[22px] font-extrabold">나의 익쏘</p>
         <p className="mt-1 text-[14px] text-[#777]">
@@ -1598,20 +1776,90 @@ function MyPage(props: {
         </button>
       </section>
 
-      <PointHistoryModal
-        isOpen={isPointHistoryOpen}
-        transactions={myTransactions}
-        onClose={() => setIsPointHistoryOpen(false)}
-        onRefresh={fetchMyTransactions}
-      />
+      <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <p className="text-[15px] font-bold">포인트 이용 내역</p>
+          <button
+            onClick={fetchMyTransactions}
+            className="rounded-full bg-[#f1efec] px-3 py-2 text-[12px] font-bold text-[#555]"
+          >
+            새로고침
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {myTransactions.map((tx) => {
+            const isPlus = tx.amount > 0
+            const description = tx.description || tx.memo || '메모 없음'
+
+            return (
+              <div
+                key={tx.id}
+                className="rounded-xl bg-[#f7f5f2] px-3 py-3 text-[13px]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-extrabold">
+                      {getPointTypeLabel(tx.type)}
+                      {tx.event_type ? ` · ${getEventTypeLabel(tx.event_type)}` : ''}
+                    </p>
+                    <p className="mt-1 text-[12px] font-semibold text-[#777]">
+                      {description}
+                    </p>
+                    <p className="mt-1 text-[12px] text-[#999]">
+                      {tx.attend_date_snapshot
+                        ? `${tx.attend_date_snapshot} 참석`
+                        : formatPointDate(tx.created_at)}
+                    </p>
+                  </div>
+
+                  <p
+                    className={
+                      isPlus
+                        ? 'shrink-0 text-[15px] font-extrabold text-[#1687bd]'
+                        : 'shrink-0 text-[15px] font-extrabold text-[#c85b70]'
+                    }
+                  >
+                    {isPlus ? '+' : ''}
+                    {tx.amount.toLocaleString()}P
+                  </p>
+                </div>
+              </div>
+            )
+          })}
+
+          {myTransactions.length === 0 && (
+            <p className="rounded-xl bg-[#f7f5f2] py-4 text-center text-[13px] text-[#777]">
+              포인트 내역이 없습니다.
+            </p>
+          )}
+        </div>
+      </section>
 
       <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
-        <p className="text-[15px] font-bold">계정 설정</p>
+        <p className="text-[15px] font-bold">비밀번호 변경</p>
+        <div className="mt-4 space-y-3">
+          <input
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            type="password"
+            placeholder="새 비밀번호"
+            className="w-full rounded-2xl border border-[#ddd6d0] bg-[#faf8f6] px-4 py-4 text-[15px] outline-none focus:border-[#c85b70]"
+          />
+          <input
+            value={newPasswordConfirm}
+            onChange={(event) => setNewPasswordConfirm(event.target.value)}
+            type="password"
+            placeholder="새 비밀번호 확인"
+            className="w-full rounded-2xl border border-[#ddd6d0] bg-[#faf8f6] px-4 py-4 text-[15px] outline-none focus:border-[#c85b70]"
+          />
+        </div>
         <button
-          onClick={() => setIsPasswordModalOpen(true)}
-          className="mt-4 w-full rounded-[20px] bg-[#252525] py-4 text-[15px] font-extrabold text-white"
+          onClick={changeMyPassword}
+          disabled={passwordChanging}
+          className="mt-4 w-full rounded-[20px] bg-[#252525] py-4 text-[15px] font-extrabold text-white disabled:opacity-60"
         >
-          비밀번호 변경
+          {passwordChanging ? '변경 중...' : '비밀번호 변경'}
         </button>
       </section>
 
