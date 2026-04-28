@@ -1401,6 +1401,76 @@ function PointHistoryModal(props: {
   )
 }
 
+function PasswordChangeModal(props: {
+  isOpen: boolean
+  newPassword: string
+  newPasswordConfirm: string
+  passwordChanging: boolean
+  setNewPassword: (value: string) => void
+  setNewPasswordConfirm: (value: string) => void
+  onClose: () => void
+  onChangePassword: () => void
+}) {
+  const {
+    isOpen,
+    newPassword,
+    newPasswordConfirm,
+    passwordChanging,
+    setNewPassword,
+    setNewPasswordConfirm,
+    onClose,
+    onChangePassword,
+  } = props
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-4 sm:items-center sm:pb-0">
+      <div className="w-full max-w-[420px] rounded-[28px] bg-white p-5 shadow-xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[20px] font-extrabold">비밀번호 변경</p>
+            <p className="mt-1 text-[13px] font-semibold text-[#777]">
+              새 비밀번호를 입력해주세요.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-full bg-[#f1efec] px-4 py-2 text-[13px] font-extrabold text-[#555]"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          <input
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            type="password"
+            placeholder="새 비밀번호"
+            className="w-full rounded-2xl border border-[#ddd6d0] bg-[#faf8f6] px-4 py-4 text-[15px] outline-none focus:border-[#c85b70]"
+          />
+          <input
+            value={newPasswordConfirm}
+            onChange={(event) => setNewPasswordConfirm(event.target.value)}
+            type="password"
+            placeholder="새 비밀번호 확인"
+            className="w-full rounded-2xl border border-[#ddd6d0] bg-[#faf8f6] px-4 py-4 text-[15px] outline-none focus:border-[#c85b70]"
+          />
+        </div>
+
+        <button
+          onClick={onChangePassword}
+          disabled={passwordChanging}
+          className="mt-5 w-full rounded-[20px] bg-[#252525] py-4 text-[15px] font-extrabold text-white disabled:opacity-60"
+        >
+          {passwordChanging ? '변경 중...' : '비밀번호 변경'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function MyPage(props: {
   member: Member
   setCurrentMember: (member: Member | null) => void
@@ -1411,6 +1481,7 @@ function MyPage(props: {
   const [myBalance, setMyBalance] = useState(0)
   const [myTransactions, setMyTransactions] = useState<PointTransaction[]>([])
   const [isPointHistoryOpen, setIsPointHistoryOpen] = useState(false)
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
   const [passwordChanging, setPasswordChanging] = useState(false)
@@ -1470,6 +1541,7 @@ function MyPage(props: {
 
     setNewPassword('')
     setNewPasswordConfirm('')
+    setIsPasswordModalOpen(false)
     alert('비밀번호를 변경했습니다.')
   }
 
@@ -1534,29 +1606,12 @@ function MyPage(props: {
       />
 
       <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
-        <p className="text-[15px] font-bold">비밀번호 변경</p>
-        <div className="mt-4 space-y-3">
-          <input
-            value={newPassword}
-            onChange={(event) => setNewPassword(event.target.value)}
-            type="password"
-            placeholder="새 비밀번호"
-            className="w-full rounded-2xl border border-[#ddd6d0] bg-[#faf8f6] px-4 py-4 text-[15px] outline-none focus:border-[#c85b70]"
-          />
-          <input
-            value={newPasswordConfirm}
-            onChange={(event) => setNewPasswordConfirm(event.target.value)}
-            type="password"
-            placeholder="새 비밀번호 확인"
-            className="w-full rounded-2xl border border-[#ddd6d0] bg-[#faf8f6] px-4 py-4 text-[15px] outline-none focus:border-[#c85b70]"
-          />
-        </div>
+        <p className="text-[15px] font-bold">계정 설정</p>
         <button
-          onClick={changeMyPassword}
-          disabled={passwordChanging}
-          className="mt-4 w-full rounded-[20px] bg-[#252525] py-4 text-[15px] font-extrabold text-white disabled:opacity-60"
+          onClick={() => setIsPasswordModalOpen(true)}
+          className="mt-4 w-full rounded-[20px] bg-[#252525] py-4 text-[15px] font-extrabold text-white"
         >
-          {passwordChanging ? '변경 중...' : '비밀번호 변경'}
+          비밀번호 변경
         </button>
       </section>
 
