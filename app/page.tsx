@@ -212,36 +212,16 @@ function getCalendarMonthLabel(year: number, month: number) {
 function getCalendarCells(year: number, month: number) {
   const firstDate = new Date(year, month, 1)
   const firstDay = firstDate.getDay()
-  const lastDate = new Date(year, month + 1, 0)
-  const lastDay = lastDate.getDate()
-
   const cells: Array<{ dateString: string; day: number; currentMonth: boolean }> = []
 
-  const prevLastDate = new Date(year, month, 0).getDate()
-  for (let i = firstDay - 1; i >= 0; i -= 1) {
-    const date = new Date(year, month - 1, prevLastDate - i)
+  // 항상 6주 × 7일 = 42칸으로 고정해서 월 변경 시 달력 높이가 변하지 않게 함
+  for (let index = 0; index < 42; index += 1) {
+    const date = new Date(year, month, index - firstDay + 1)
+
     cells.push({
       dateString: date.toLocaleDateString('sv-SE'),
       day: date.getDate(),
-      currentMonth: false,
-    })
-  }
-
-  for (let day = 1; day <= lastDay; day += 1) {
-    const date = new Date(year, month, day)
-    cells.push({
-      dateString: date.toLocaleDateString('sv-SE'),
-      day,
-      currentMonth: true,
-    })
-  }
-
-  while (cells.length % 7 !== 0) {
-    const date = new Date(year, month + 1, cells.length - firstDay - lastDay + 1)
-    cells.push({
-      dateString: date.toLocaleDateString('sv-SE'),
-      day: date.getDate(),
-      currentMonth: false,
+      currentMonth: date.getMonth() === month,
     })
   }
 
