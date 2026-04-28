@@ -200,6 +200,60 @@ function moveMonth(monthKey: string, monthOffset: number) {
   date.setMonth(date.getMonth() + monthOffset)
   return date.toLocaleDateString('sv-SE').slice(0, 7)
 }
+function getDateFromString(dateString: string) {
+  const [year, month, day] = dateString.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function formatKoreanDate(dateString: string) {
+  const date = getDateFromString(dateString)
+  const weekdays = ['일', '월', '화', '수', '목', '금', '토']
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${weekdays[date.getDay()]}요일`
+}
+
+function getCalendarMonthLabel(year: number, month: number) {
+  return `${year}년 ${month + 1}월`
+}
+
+function getCalendarCells(year: number, month: number) {
+  const firstDate = new Date(year, month, 1)
+  const firstDay = firstDate.getDay()
+  const lastDate = new Date(year, month + 1, 0)
+  const lastDay = lastDate.getDate()
+
+  const cells: Array<{ dateString: string; day: number; currentMonth: boolean }> = []
+
+  const prevLastDate = new Date(year, month, 0).getDate()
+  for (let i = firstDay - 1; i >= 0; i -= 1) {
+    const date = new Date(year, month - 1, prevLastDate - i)
+    cells.push({
+      dateString: date.toLocaleDateString('sv-SE'),
+      day: date.getDate(),
+      currentMonth: false,
+    })
+  }
+
+  for (let day = 1; day <= lastDay; day += 1) {
+    const date = new Date(year, month, day)
+    cells.push({
+      dateString: date.toLocaleDateString('sv-SE'),
+      day,
+      currentMonth: true,
+    })
+  }
+
+  while (cells.length % 7 !== 0) {
+    const date = new Date(year, month + 1, cells.length - firstDay - lastDay + 1)
+    cells.push({
+      dateString: date.toLocaleDateString('sv-SE'),
+      day: date.getDate(),
+      currentMonth: false,
+    })
+  }
+
+  return cells
+}
+
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('home')
@@ -209,6 +263,7 @@ export default function Home() {
   const [authChecking, setAuthChecking] = useState(true)
 
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('sv-SE'))
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [monthlyMonthKey, setMonthlyMonthKey] = useState(getMonthKey(new Date().toLocaleDateString('sv-SE')))
   const [currentMonthlyMembers, setCurrentMonthlyMembers] = useState<Member[]>([])
   const [members, setMembers] = useState<Member[]>([])
@@ -426,7 +481,17 @@ export default function Home() {
           closeModal={() => setIsAttendModalOpen(false)}
           registerAttendance={registerAttendance}
         />
-      )}
+      
+        <CalendarModal
+          isOpen={isCalendarOpen}
+          selectedDate={selectedDate}
+          onClose={() => setIsCalendarOpen(false)}
+          onSelectDate={(date) => {
+            setSelectedDate(date)
+            setIsCalendarOpen(false)
+          }}
+        />
+)}
 
       <BottomTabs activeTab={activeTab} setActiveTab={(tab) => {
         setActiveTab(tab)
@@ -563,6 +628,7 @@ function MeetingScreen(props: {
   const {
     selectedDate,
     setSelectedDate,
+    openCalendar,
     todayLabel,
     attendeesCount,
     groupedAttendees,
@@ -676,6 +742,109 @@ function AttendanceTable(props: {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function CalendarModal(props: {
+  isOpen: boolean
+  selectedDate: string
+  onClose: () => void
+  onSelectDate: (date: string) => void
+}) {
+  const { isOpen, selectedDate, onClose, onSelectDate } = props
+  const selected = getDateFromString(selectedDate)
+  const [viewYear, setViewYear] = useState(selected.getFullYear())
+  const [viewMonth, setViewMonth] = useState(selected.getMonth())
+
+  useEffect(() => {
+    if (isOpen) {
+      const date = getDateFromString(selectedDate)
+      setViewYear(date.getFullYear())
+      setViewMonth(date.getMonth())
+    }
+  }, [isOpen, selectedDate])
+
+  if (!isOpen) return null
+
+  const cells = getCalendarCells(viewYear, viewMonth)
+  const todayString = new Date().toLocaleDateString('sv-SE')
+
+  function moveViewMonth(offset: number) {
+    const next = new Date(viewYear, viewMonth + offset, 1)
+    setViewYear(next.getFullYear())
+    setViewMonth(next.getMonth())
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-4 sm:items-center sm:pb-0">
+      <div className="w-full max-w-[420px] rounded-[28px] bg-white p-5 shadow-xl">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => moveViewMonth(-1)}
+            className="rounded-full bg-[#f1efec] px-4 py-2 text-[20px] font-extrabold text-[#555]"
+          >
+            ‹
+          </button>
+          <p className="text-[20px] font-extrabold">
+            {getCalendarMonthLabel(viewYear, viewMonth)}
+          </p>
+          <button
+            onClick={() => moveViewMonth(1)}
+            className="rounded-full bg-[#f1efec] px-4 py-2 text-[20px] font-extrabold text-[#555]"
+          >
+            ›
+          </button>
+        </div>
+
+        <div className="mt-5 grid grid-cols-7 gap-1 text-center text-[12px] font-extrabold text-[#888]">
+          {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
+            <div key={day} className="py-2">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((cell) => {
+            const active = cell.dateString === selectedDate
+            const isToday = cell.dateString === todayString
+
+            return (
+              <button
+                key={cell.dateString}
+                onClick={() => onSelectDate(cell.dateString)}
+                className={
+                  active
+                    ? 'aspect-square rounded-2xl bg-[#c85b70] text-[14px] font-extrabold text-white'
+                    : isToday
+                      ? 'aspect-square rounded-2xl bg-[#f1e8e6] text-[14px] font-extrabold text-[#c85b70]'
+                      : cell.currentMonth
+                        ? 'aspect-square rounded-2xl bg-[#f7f5f2] text-[14px] font-bold text-[#333]'
+                        : 'aspect-square rounded-2xl bg-[#fafafa] text-[14px] font-bold text-[#bbb]'
+                }
+              >
+                {cell.day}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button
+            onClick={() => onSelectDate(todayString)}
+            className="rounded-2xl bg-[#f1efec] py-3 text-[14px] font-extrabold text-[#555]"
+          >
+            오늘
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-2xl bg-[#252525] py-3 text-[14px] font-extrabold text-white"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
