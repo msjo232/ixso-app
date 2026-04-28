@@ -315,8 +315,7 @@ export default function AdminPage() {
           member_id: attendance.member_id,
           type: 'use',
           amount: -amount,
-          balance_after: balanceAfter,
-          memo: `${getEventTypeLabel(attendance.event_type)} 참석 차감`,
+          description: `${getEventTypeLabel(attendance.event_type)} 참석 차감`,
           event_type: attendance.event_type,
           related_attendance_id: attendance.id,
           attend_date_snapshot: attendance.attend_date,
@@ -425,10 +424,9 @@ export default function AdminPage() {
       .from('point_transactions')
       .insert({
         member_id: selectedMember.id,
-        type,
+        type: type === 'charge' ? 'charge' : type === 'use' ? 'use' : 'adjust',
         amount: signedAmount,
-        balance_after: balanceAfter,
-        memo: pointMemo.trim() || null,
+        description: pointMemo.trim() || null,
         event_type: 'manual',
       })
 
