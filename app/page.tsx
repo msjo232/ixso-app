@@ -205,12 +205,6 @@ function getDateFromString(dateString: string) {
   return new Date(year, month - 1, day)
 }
 
-function formatKoreanDate(dateString: string) {
-  const date = getDateFromString(dateString)
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토']
-  return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${weekdays[date.getDay()]}요일`
-}
-
 function getCalendarMonthLabel(year: number, month: number) {
   return `${year}년 ${month + 1}월`
 }
@@ -430,6 +424,7 @@ export default function Home() {
           <MeetingScreen
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
+            openCalendar={() => setIsCalendarOpen(true)}
             todayLabel={todayLabel}
             attendeesCount={attendees.length}
             groupedAttendees={groupedAttendees}
@@ -481,17 +476,17 @@ export default function Home() {
           closeModal={() => setIsAttendModalOpen(false)}
           registerAttendance={registerAttendance}
         />
-      
-        <CalendarModal
-          isOpen={isCalendarOpen}
-          selectedDate={selectedDate}
-          onClose={() => setIsCalendarOpen(false)}
-          onSelectDate={(date) => {
-            setSelectedDate(date)
-            setIsCalendarOpen(false)
-          }}
-        />
-)}
+      )}
+
+      <CalendarModal
+        isOpen={isCalendarOpen}
+        selectedDate={selectedDate}
+        onClose={() => setIsCalendarOpen(false)}
+        onSelectDate={(date) => {
+          setSelectedDate(date)
+          setIsCalendarOpen(false)
+        }}
+      />
 
       <BottomTabs activeTab={activeTab} setActiveTab={(tab) => {
         setActiveTab(tab)
@@ -616,6 +611,7 @@ function FeeRow(props: { title: string; price: string; desc: string }) {
 function MeetingScreen(props: {
   selectedDate: string
   setSelectedDate: (date: string) => void
+  openCalendar: () => void
   todayLabel: string
   attendeesCount: number
   groupedAttendees: {
@@ -656,7 +652,7 @@ function MeetingScreen(props: {
           </button>
 
           <button
-            onClick={openDatePicker}
+            onClick={openCalendar}
             className="rounded-2xl px-4 py-2 text-[18px] font-extrabold active:bg-[#f1efec]"
           >
             {todayLabel}
@@ -669,15 +665,6 @@ function MeetingScreen(props: {
           >
             ›
           </button>
-
-          <input
-            id="ixso-date-picker"
-            type="date"
-            value={selectedDate}
-            onChange={(event) => setSelectedDate(event.target.value)}
-            className="pointer-events-none absolute left-1/2 top-1/2 h-0 w-0 opacity-0"
-            aria-label="날짜 선택"
-          />
         </div>
       </section>
 
@@ -781,6 +768,7 @@ function CalendarModal(props: {
       <div className="w-full max-w-[420px] rounded-[28px] bg-white p-5 shadow-xl">
         <div className="flex items-center justify-between">
           <button
+            type="button"
             onClick={() => moveViewMonth(-1)}
             className="rounded-full bg-[#f1efec] px-4 py-2 text-[20px] font-extrabold text-[#555]"
           >
@@ -790,6 +778,7 @@ function CalendarModal(props: {
             {getCalendarMonthLabel(viewYear, viewMonth)}
           </p>
           <button
+            type="button"
             onClick={() => moveViewMonth(1)}
             className="rounded-full bg-[#f1efec] px-4 py-2 text-[20px] font-extrabold text-[#555]"
           >
@@ -812,6 +801,7 @@ function CalendarModal(props: {
 
             return (
               <button
+                type="button"
                 key={cell.dateString}
                 onClick={() => onSelectDate(cell.dateString)}
                 className={
@@ -832,12 +822,14 @@ function CalendarModal(props: {
 
         <div className="mt-5 grid grid-cols-2 gap-2">
           <button
+            type="button"
             onClick={() => onSelectDate(todayString)}
             className="rounded-2xl bg-[#f1efec] py-3 text-[14px] font-extrabold text-[#555]"
           >
             오늘
           </button>
           <button
+            type="button"
             onClick={onClose}
             className="rounded-2xl bg-[#252525] py-3 text-[14px] font-extrabold text-white"
           >
