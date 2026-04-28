@@ -52,6 +52,14 @@ type MonthlyMembership = {
   members?: Member
 }
 
+type PasswordResetRequest = {
+  id: string
+  login_id: string
+  nickname?: string | null
+  status: string
+  requested_at: string
+}
+
 type MahjongSettlementRow = {
   date: string
   nickname: string
@@ -67,7 +75,7 @@ type MahjongSettlementRow = {
 }
 
 type Tab = 'home' | 'meeting' | 'my'
-type AuthMode = 'login' | 'signup'
+type AuthMode = 'login' | 'signup' | 'reset'
 
 function formatDateLabel(dateString: string) {
   const [year, month, day] = dateString.split('-').map(Number)
@@ -819,7 +827,96 @@ function AuthScreen(props: {
     return <SignupScreen setAuthMode={setAuthMode} />
   }
 
+  if (authMode === 'reset') {
+    return <PasswordResetRequestScreen setAuthMode={setAuthMode} />
+  }
+
   return <LoginScreen setAuthMode={setAuthMode} setCurrentMember={setCurrentMember} />
+}
+
+function PasswordResetRequestScreen(props: {
+  setAuthMode: (mode: AuthMode) => void
+}) {
+  const { setAuthMode } = props
+  const [loginId, setLoginId] = useState('')
+  const [nickname, setNickname] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function requestPasswordReset() {
+    const cleanLoginId = loginId.trim()
+    const cleanNickname = nickname.trim()
+
+    if (!cleanLoginId) {
+      alert('아이디를 입력해주세요.')
+      return
+    }
+
+    setLoading(true)
+
+    const { error } = await supabase
+      .from('password_reset_requests')
+      .insert({
+        login_id: cleanLoginId,
+        nickname: cleanNickname || null,
+        status: 'pending',
+      })
+
+    setLoading(false)
+
+    if (error) {
+      console.error(error)
+      alert('비밀번호 초기화 요청에 실패했습니다.')
+      return
+    }
+
+    alert('비밀번호 초기화 요청을 보냈습니다. 운영진에게 문의해주세요.')
+    setAuthMode('login')
+  }
+
+  return (
+    <div className="space-y-5">
+      <section className="pt-2">
+        <p className="text-[22px] font-extrabold">비밀번호 찾기</p>
+        <p className="mt-1 text-[14px] text-[#777]">
+          아이디를 입력하면 운영진에게 초기화 요청이 전달됩니다.
+        </p>
+      </section>
+
+      <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
+        <p className="text-[15px] font-bold">초기화 요청</p>
+
+        <div className="mt-5 space-y-3">
+          <input
+            value={loginId}
+            onChange={(event) => setLoginId(event.target.value)}
+            placeholder="아이디"
+            className="w-full rounded-2xl border border-[#ddd6d0] bg-[#faf8f6] px-4 py-4 text-[15px] outline-none focus:border-[#c85b70]"
+          />
+          <input
+            value={nickname}
+            onChange={(event) => setNickname(event.target.value)}
+            placeholder="닉네임"
+            className="w-full rounded-2xl border border-[#ddd6d0] bg-[#faf8f6] px-4 py-4 text-[15px] outline-none focus:border-[#c85b70]"
+          />
+        </div>
+
+        <button
+          onClick={requestPasswordReset}
+          disabled={loading}
+          className="mt-5 w-full rounded-[20px] bg-[#c85b70] py-4 text-[16px] font-extrabold text-white shadow-sm disabled:opacity-60"
+        >
+          {loading ? '요청 중...' : '초기화 요청하기'}
+        </button>
+
+        <button
+          onClick={() => setAuthMode('login')}
+          className="mt-5 w-full text-right text-[13px] font-bold text-[#777]"
+        >
+          로그인으로 돌아가기
+        </button>
+      </section>
+    </div>
+  )
 }
 
 function LoginScreen(props: {
@@ -911,7 +1008,7 @@ function LoginScreen(props: {
 
         <div className="mt-5 flex items-center justify-between text-[13px] font-bold text-[#777]">
           <button onClick={() => setAuthMode('signup')}>회원가입</button>
-          <button>비밀번호 찾기</button>
+          <button onClick={() => setAuthMode('reset')}>비밀번호 찾기</button>
         </div>
       </section>
     </div>
@@ -1047,6 +1144,9 @@ function MyPage(props: {
   const isAdmin = member.role === 'admin'
   const [myBalance, setMyBalance] = useState(0)
   const [myTransactions, setMyTransactions] = useState<PointTransaction[]>([])
+  const [newPassword, setNewPassword] = useState('')
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
+  const [passwordChanging, setPasswordChanging] = useState(false)
 
   useEffect(() => {
     fetchMyPoint()
@@ -1074,6 +1174,36 @@ function MyPage(props: {
     if (!error && data) {
       setMyTransactions(data)
     }
+  }
+
+  async function changeMyPassword() {
+    if (newPassword.length < 6) {
+      alert('새 비밀번호는 6자 이상으로 입력해주세요.')
+      return
+    }
+
+    if (newPassword !== newPasswordConfirm) {
+      alert('새 비밀번호가 서로 다릅니다.')
+      return
+    }
+
+    setPasswordChanging(true)
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
+
+    setPasswordChanging(false)
+
+    if (error) {
+      console.error(error)
+      alert('비밀번호 변경에 실패했습니다.')
+      return
+    }
+
+    setNewPassword('')
+    setNewPasswordConfirm('')
+    alert('비밀번호를 변경했습니다.')
   }
 
   async function handleLogout() {
@@ -1163,6 +1293,33 @@ function MyPage(props: {
             </p>
           )}
         </div>
+      </section>
+
+      <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
+        <p className="text-[15px] font-bold">비밀번호 변경</p>
+        <div className="mt-4 space-y-3">
+          <input
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            type="password"
+            placeholder="새 비밀번호"
+            className="w-full rounded-2xl border border-[#ddd6d0] bg-[#faf8f6] px-4 py-4 text-[15px] outline-none focus:border-[#c85b70]"
+          />
+          <input
+            value={newPasswordConfirm}
+            onChange={(event) => setNewPasswordConfirm(event.target.value)}
+            type="password"
+            placeholder="새 비밀번호 확인"
+            className="w-full rounded-2xl border border-[#ddd6d0] bg-[#faf8f6] px-4 py-4 text-[15px] outline-none focus:border-[#c85b70]"
+          />
+        </div>
+        <button
+          onClick={changeMyPassword}
+          disabled={passwordChanging}
+          className="mt-4 w-full rounded-[20px] bg-[#252525] py-4 text-[15px] font-extrabold text-white disabled:opacity-60"
+        >
+          {passwordChanging ? '변경 중...' : '비밀번호 변경'}
+        </button>
       </section>
 
       <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">

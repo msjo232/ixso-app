@@ -41,7 +41,17 @@ type MonthlyMembership = {
   members?: Member
 }
 
-type AdminTab = 'dashboard' | 'meeting' | 'payments' | 'members' | 'points' | 'monthly'
+type PasswordResetRequest = {
+  id: string
+  login_id: string
+  nickname?: string | null
+  status: string
+  requested_at: string
+  processed_at?: string | null
+  memo?: string | null
+}
+
+type AdminTab = 'dashboard' | 'meeting' | 'payments' | 'members' | 'points' | 'monthly' | 'passwords'
 
 function getEventTypeLabel(type?: string | null) {
   if (type === 'mahjong') return '마작'
@@ -90,6 +100,7 @@ export default function AdminPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [wallets, setWallets] = useState<PointWallet[]>([])
   const [monthlyMemberships, setMonthlyMemberships] = useState<MonthlyMembership[]>([])
+  const [passwordResetRequests, setPasswordResetRequests] = useState<PasswordResetRequest[]>([])
 
   const [memberKeyword, setMemberKeyword] = useState('')
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
@@ -158,6 +169,7 @@ export default function AdminPage() {
       fetchRecentConfirmed(),
       fetchMonthlyAttendances(),
       fetchMonthlyMemberships(),
+      fetchPasswordResetRequests(),
     ])
   }
 
@@ -545,6 +557,9 @@ export default function AdminPage() {
             <SideButton active={activeTab === 'monthly'} onClick={() => setActiveTab('monthly')}>
               월회원관리
             </SideButton>
+            <SideButton active={activeTab === 'passwords'} onClick={() => setActiveTab('passwords')}>
+              비밀번호 초기화
+            </SideButton>
           </nav>
 
           <button
@@ -567,6 +582,7 @@ export default function AdminPage() {
                   {activeTab === 'members' && '회원 전체 목록'}
                   {activeTab === 'points' && '포인트 관리'}
                   {activeTab === 'monthly' && '월회원 관리'}
+                  {activeTab === 'passwords' && '비밀번호 초기화'}
                 </h1>
               </div>
 
@@ -640,6 +656,14 @@ export default function AdminPage() {
                 membershipType={membershipType}
                 setMembershipType={setMembershipType}
                 updateMonthlyStatus={updateMonthlyStatus}
+              />
+            )}
+
+            {activeTab === 'passwords' && (
+              <PasswordResetManager
+                adminMember={adminMember}
+                requests={passwordResetRequests}
+                refreshRequests={fetchPasswordResetRequests}
               />
             )}
           </div>
@@ -1371,6 +1395,165 @@ function MonthlyManager(props: {
             {props.monthlyMemberships.length === 0 && (
               <p className="col-span-3 py-8 text-center text-sm font-bold text-[#999]">
                 등록된 월회원이 없습니다.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PasswordResetManager(props: {
+  adminMember: Member
+  requests: PasswordResetRequest[]
+  refreshRequests: () => void
+}) {
+  const [selectedRequest, setSelectedRequest] = useState<PasswordResetRequest | null>(null)
+  const [temporaryPassword, setTemporaryPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const pendingRequests = props.requests.filter((request) => request.status === 'pending')
+  const doneRequests = props.requests.filter((request) => request.status !== 'pending')
+
+  async function resetPassword() {
+    if (!selectedRequest) {
+      alert('초기화 요청을 선택해주세요.')
+      return
+    }
+
+    if (temporaryPassword.length < 6) {
+      alert('임시 비밀번호는 6자 이상으로 입력해주세요.')
+      return
+    }
+
+    setLoading(true)
+
+    const response = await fetch('/api/admin/reset-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        requestId: selectedRequest.id,
+        loginId: selectedRequest.login_id,
+        temporaryPassword,
+        adminMemberId: props.adminMember.id,
+      }),
+    })
+
+    const result = await response.json()
+    setLoading(false)
+
+    if (!response.ok) {
+      alert(result.error || '비밀번호 초기화에 실패했습니다.')
+      return
+    }
+
+    alert(`${selectedRequest.nickname || selectedRequest.login_id}님의 비밀번호를 초기화했습니다.`)
+    setSelectedRequest(null)
+    setTemporaryPassword('')
+    props.refreshRequests()
+  }
+
+  return (
+    <div className="grid grid-cols-[420px_1fr] gap-6">
+      <div className="rounded-3xl bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <p className="text-lg font-extrabold">초기화 요청</p>
+          <button
+            onClick={props.refreshRequests}
+            className="rounded-xl bg-[#f1efec] px-3 py-2 text-xs font-extrabold text-[#555]"
+          >
+            새로고침
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {pendingRequests.map((request) => (
+            <button
+              key={request.id}
+              onClick={() => setSelectedRequest(request)}
+              className={
+                selectedRequest?.id === request.id
+                  ? 'w-full rounded-2xl bg-[#c85b70] px-4 py-3 text-left font-extrabold text-white'
+                  : 'w-full rounded-2xl bg-[#f7f5f2] px-4 py-3 text-left font-extrabold text-[#555]'
+              }
+            >
+              {request.nickname || '닉네임 없음'}
+              <span className="block text-xs font-bold opacity-70">
+                {request.login_id} · {new Date(request.requested_at).toLocaleString('ko-KR')}
+              </span>
+            </button>
+          ))}
+
+          {pendingRequests.length === 0 && (
+            <p className="rounded-2xl bg-[#f7f5f2] py-8 text-center text-sm font-bold text-[#999]">
+              대기 중인 요청이 없습니다.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div className="rounded-3xl bg-white p-6 shadow-sm">
+          <p className="text-xl font-extrabold">비밀번호 초기화</p>
+          <p className="mt-1 text-sm font-bold text-[#777]">
+            선택한 회원의 비밀번호를 임시 비밀번호로 변경합니다.
+          </p>
+
+          {selectedRequest ? (
+            <div className="mt-6 max-w-xl">
+              <p className="text-sm font-bold text-[#777]">선택 요청</p>
+              <p className="mt-1 text-2xl font-extrabold">
+                {selectedRequest.nickname || '닉네임 없음'}
+              </p>
+              <p className="mt-1 text-sm font-bold text-[#777]">
+                아이디: {selectedRequest.login_id}
+              </p>
+
+              <input
+                value={temporaryPassword}
+                onChange={(event) => setTemporaryPassword(event.target.value)}
+                type="text"
+                placeholder="임시 비밀번호"
+                className="mt-6 w-full rounded-2xl border border-[#ddd6d0] px-4 py-3 outline-none focus:border-[#c85b70]"
+              />
+
+              <button
+                onClick={resetPassword}
+                disabled={loading}
+                className="mt-4 w-full rounded-2xl bg-[#c85b70] py-3 font-extrabold text-white disabled:opacity-60"
+              >
+                {loading ? '초기화 중...' : '임시 비밀번호로 변경'}
+              </button>
+
+              <p className="mt-3 text-xs font-semibold text-[#777]">
+                변경 후 회원에게 임시 비밀번호를 알려주세요.
+              </p>
+            </div>
+          ) : (
+            <p className="mt-10 text-sm font-bold text-[#999]">
+              왼쪽에서 초기화 요청을 선택해주세요.
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-3xl bg-white p-6 shadow-sm">
+          <p className="text-lg font-extrabold">처리 완료 내역</p>
+          <div className="mt-4 space-y-2">
+            {doneRequests.map((request) => (
+              <div key={request.id} className="rounded-2xl bg-[#f7f5f2] px-4 py-3">
+                <p className="font-extrabold">{request.nickname || '닉네임 없음'}</p>
+                <p className="text-xs font-bold text-[#777]">
+                  {request.login_id} · {request.status} · {request.processed_at ? new Date(request.processed_at).toLocaleString('ko-KR') : '-'}
+                </p>
+              </div>
+            ))}
+
+            {doneRequests.length === 0 && (
+              <p className="rounded-2xl bg-[#f7f5f2] py-8 text-center text-sm font-bold text-[#999]">
+                처리 완료 내역이 없습니다.
               </p>
             )}
           </div>
