@@ -125,6 +125,13 @@ function getPaymentStatusLabel(status?: string | null) {
   if (status === 'rejected') return '취소'
   return '확인대기'
 }
+function getPointTypeLabel(type?: string | null) {
+  if (type === 'charge') return '충전'
+  if (type === 'use') return '차감'
+  if (type === 'adjust') return '조정'
+  return '포인트'
+}
+
 function formatPointDateTime(value?: string | null) {
   if (!value) return ''
   const date = new Date(value)
@@ -135,24 +142,6 @@ function formatPointDateTime(value?: string | null) {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  })
-}
-
-function getPointTypeLabel(type?: string | null) {
-  if (type === 'charge') return '충전'
-  if (type === 'use') return '차감'
-  if (type === 'adjust') return '조정'
-  return '포인트'
-}
-
-function formatPointDate(value?: string | null) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
   })
 }
 
@@ -232,34 +221,6 @@ function moveMonth(monthKey: string, monthOffset: number) {
   date.setMonth(date.getMonth() + monthOffset)
   return date.toLocaleDateString('sv-SE').slice(0, 7)
 }
-function getDateFromString(dateString: string) {
-  const [year, month, day] = dateString.split('-').map(Number)
-  return new Date(year, month - 1, day)
-}
-
-function getCalendarMonthLabel(year: number, month: number) {
-  return `${year}년 ${month + 1}월`
-}
-
-function getCalendarCells(year: number, month: number) {
-  const firstDate = new Date(year, month, 1)
-  const firstDay = firstDate.getDay()
-  const cells: Array<{ dateString: string; day: number; currentMonth: boolean }> = []
-
-  // 항상 6주 × 7일 = 42칸으로 고정해서 월 변경 시 달력 높이가 변하지 않게 함
-  for (let index = 0; index < 42; index += 1) {
-    const date = new Date(year, month, index - firstDay + 1)
-
-    cells.push({
-      dateString: date.toLocaleDateString('sv-SE'),
-      day: date.getDate(),
-      currentMonth: date.getMonth() === month,
-    })
-  }
-
-  return cells
-}
-
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('home')
@@ -269,7 +230,6 @@ export default function Home() {
   const [authChecking, setAuthChecking] = useState(true)
 
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('sv-SE'))
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [monthlyMonthKey, setMonthlyMonthKey] = useState(getMonthKey(new Date().toLocaleDateString('sv-SE')))
   const [currentMonthlyMembers, setCurrentMonthlyMembers] = useState<Member[]>([])
   const [members, setMembers] = useState<Member[]>([])
@@ -436,7 +396,6 @@ export default function Home() {
           <MeetingScreen
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
-            openCalendar={() => setIsCalendarOpen(true)}
             todayLabel={todayLabel}
             attendeesCount={attendees.length}
             groupedAttendees={groupedAttendees}
@@ -489,16 +448,6 @@ export default function Home() {
           registerAttendance={registerAttendance}
         />
       )}
-
-      <CalendarModal
-        isOpen={isCalendarOpen}
-        selectedDate={selectedDate}
-        onClose={() => setIsCalendarOpen(false)}
-        onSelectDate={(date) => {
-          setSelectedDate(date)
-          setIsCalendarOpen(false)
-        }}
-      />
 
       <BottomTabs activeTab={activeTab} setActiveTab={(tab) => {
         setActiveTab(tab)
@@ -623,7 +572,6 @@ function FeeRow(props: { title: string; price: string; desc: string }) {
 function MeetingScreen(props: {
   selectedDate: string
   setSelectedDate: (date: string) => void
-  openCalendar: () => void
   todayLabel: string
   attendeesCount: number
   groupedAttendees: {
@@ -636,7 +584,6 @@ function MeetingScreen(props: {
   const {
     selectedDate,
     setSelectedDate,
-    openCalendar,
     todayLabel,
     attendeesCount,
     groupedAttendees,
@@ -664,7 +611,7 @@ function MeetingScreen(props: {
           </button>
 
           <button
-            onClick={openCalendar}
+            onClick={openDatePicker}
             className="rounded-2xl px-4 py-2 text-[18px] font-extrabold active:bg-[#f1efec]"
           >
             {todayLabel}
@@ -677,6 +624,15 @@ function MeetingScreen(props: {
           >
             ›
           </button>
+
+          <input
+            id="ixso-date-picker"
+            type="date"
+            value={selectedDate}
+            onChange={(event) => setSelectedDate(event.target.value)}
+            className="pointer-events-none absolute left-1/2 top-1/2 h-0 w-0 opacity-0"
+            aria-label="날짜 선택"
+          />
         </div>
       </section>
 
@@ -741,114 +697,6 @@ function AttendanceTable(props: {
           </div>
         </div>
       ))}
-    </div>
-  )
-}
-
-function CalendarModal(props: {
-  isOpen: boolean
-  selectedDate: string
-  onClose: () => void
-  onSelectDate: (date: string) => void
-}) {
-  const { isOpen, selectedDate, onClose, onSelectDate } = props
-  const selected = getDateFromString(selectedDate)
-  const [viewYear, setViewYear] = useState(selected.getFullYear())
-  const [viewMonth, setViewMonth] = useState(selected.getMonth())
-
-  useEffect(() => {
-    if (isOpen) {
-      const date = getDateFromString(selectedDate)
-      setViewYear(date.getFullYear())
-      setViewMonth(date.getMonth())
-    }
-  }, [isOpen, selectedDate])
-
-  if (!isOpen) return null
-
-  const cells = getCalendarCells(viewYear, viewMonth)
-  const todayString = new Date().toLocaleDateString('sv-SE')
-
-  function moveViewMonth(offset: number) {
-    const next = new Date(viewYear, viewMonth + offset, 1)
-    setViewYear(next.getFullYear())
-    setViewMonth(next.getMonth())
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-4 sm:items-center sm:pb-0">
-      <div className="w-full max-w-[420px] rounded-[28px] bg-white p-5 shadow-xl">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => moveViewMonth(-1)}
-            className="rounded-full bg-[#f1efec] px-4 py-2 text-[20px] font-extrabold text-[#555]"
-          >
-            ‹
-          </button>
-          <p className="text-[20px] font-extrabold">
-            {getCalendarMonthLabel(viewYear, viewMonth)}
-          </p>
-          <button
-            type="button"
-            onClick={() => moveViewMonth(1)}
-            className="rounded-full bg-[#f1efec] px-4 py-2 text-[20px] font-extrabold text-[#555]"
-          >
-            ›
-          </button>
-        </div>
-
-        <div className="mt-5 grid grid-cols-7 gap-1 text-center text-[12px] font-extrabold text-[#888]">
-          {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
-            <div key={day} className="py-2">
-              {day}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map((cell) => {
-            const active = cell.dateString === selectedDate
-            const isToday = cell.dateString === todayString
-
-            return (
-              <button
-                type="button"
-                key={cell.dateString}
-                onClick={() => onSelectDate(cell.dateString)}
-                className={
-                  active
-                    ? 'aspect-square rounded-2xl bg-[#c85b70] text-[14px] font-extrabold text-white'
-                    : isToday
-                      ? 'aspect-square rounded-2xl bg-[#f1e8e6] text-[14px] font-extrabold text-[#c85b70]'
-                      : cell.currentMonth
-                        ? 'aspect-square rounded-2xl bg-[#f7f5f2] text-[14px] font-bold text-[#333]'
-                        : 'aspect-square rounded-2xl bg-[#fafafa] text-[14px] font-bold text-[#bbb]'
-                }
-              >
-                {cell.day}
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="mt-5 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => onSelectDate(todayString)}
-            className="rounded-2xl bg-[#f1efec] py-3 text-[14px] font-extrabold text-[#555]"
-          >
-            오늘
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-2xl bg-[#252525] py-3 text-[14px] font-extrabold text-white"
-          >
-            닫기
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
@@ -1478,9 +1326,10 @@ function PasswordChangeModal(props: {
 function MyPage(props: {
   member: Member
   setCurrentMember: (member: Member | null) => void
-  setShowAdminPage: (value: boolean) => void
+  openAdminPage: () => void
 }) {
-  const { member, setCurrentMember, setShowAdminPage } = props
+  const { member, setCurrentMember, openAdminPage } = props
+  const isAdmin = member.role === 'admin'
   const [myBalance, setMyBalance] = useState(0)
   const [myTransactions, setMyTransactions] = useState<PointTransaction[]>([])
   const [isPointHistoryOpen, setIsPointHistoryOpen] = useState(false)
@@ -1590,12 +1439,12 @@ function MyPage(props: {
         </button>
       </section>
 
-      {member.role === 'admin' && (
+      {isAdmin && (
         <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
           <p className="text-[15px] font-bold">관리자</p>
           <button
             type="button"
-            onClick={() => setShowAdminPage(true)}
+            onClick={openAdminPage}
             className="mt-4 w-full rounded-[20px] bg-[#252525] py-4 text-[15px] font-extrabold text-white"
           >
             관리자 페이지 접속
@@ -1619,7 +1468,7 @@ function MyPage(props: {
         <div className="mt-4 rounded-2xl bg-[#f7f5f2] p-4">
           <p className="text-[13px] font-bold text-[#777]">닉네임</p>
           <p className="mt-1 text-[18px] font-extrabold">
-            {member.nickname} {member.role === 'admin' ? '👑' : ''}
+            {member.nickname} {isAdmin ? '👑' : ''}
           </p>
         </div>
         <div className="mt-3 rounded-2xl bg-[#f7f5f2] p-4">
@@ -1686,10 +1535,10 @@ function MyPage(props: {
   async function fetchMyTransactions() {
     const { data, error } = await supabase
       .from('point_transactions')
-      .select('id, member_id, type, amount, description, event_type, related_attendance_id, attend_date_snapshot, created_at')
+      .select('*')
       .eq('member_id', member.id)
       .order('created_at', { ascending: false })
-      .limit(30)
+      .limit(20)
 
     if (!error && data) {
       setMyTransactions(data)
@@ -1780,56 +1629,32 @@ function MyPage(props: {
       </section>
 
       <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <p className="text-[15px] font-bold">포인트 이용 내역</p>
-          <button
-            onClick={fetchMyTransactions}
-            className="rounded-full bg-[#f1efec] px-3 py-2 text-[12px] font-bold text-[#555]"
-          >
-            새로고침
-          </button>
-        </div>
-
+        <p className="text-[15px] font-bold">포인트 이용 내역</p>
         <div className="mt-4 space-y-2">
-          {myTransactions.map((tx) => {
-            const isPlus = tx.amount > 0
-            const description = tx.description || tx.memo || '메모 없음'
-
-            return (
-              <div
-                key={tx.id}
-                className="rounded-xl bg-[#f7f5f2] px-3 py-3 text-[13px]"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-extrabold">
-                      {getPointTypeLabel(tx.type)}
-                      {tx.event_type ? ` · ${getEventTypeLabel(tx.event_type)}` : ''}
-                    </p>
-                    <p className="mt-1 text-[12px] font-semibold text-[#777]">
-                      {description}
-                    </p>
-                    <p className="mt-1 text-[12px] text-[#999]">
-                      {tx.attend_date_snapshot
-                        ? `${tx.attend_date_snapshot} 참석`
-                        : formatPointDate(tx.created_at)}
-                    </p>
-                  </div>
-
-                  <p
-                    className={
-                      isPlus
-                        ? 'shrink-0 text-[15px] font-extrabold text-[#1687bd]'
-                        : 'shrink-0 text-[15px] font-extrabold text-[#c85b70]'
-                    }
-                  >
-                    {isPlus ? '+' : ''}
-                    {tx.amount.toLocaleString()}P
-                  </p>
-                </div>
+          {myTransactions.map((tx) => (
+            <div
+              key={tx.id}
+              className="flex items-center justify-between rounded-xl bg-[#f7f5f2] px-3 py-2 text-[13px]"
+            >
+              <div>
+                <p className="font-bold">
+                  {tx.type === 'charge' ? '충전' : tx.type === 'use' ? '차감' : '조정'}
+                </p>
+                <p className="text-[12px] text-[#777]">
+                  {tx.memo || '메모 없음'}
+                  {tx.attend_date_snapshot ? ` · ${tx.attend_date_snapshot}` : ''}
+                </p>
               </div>
-            )
-          })}
+              <div className="text-right">
+                <p className="font-extrabold">
+                  {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}P
+                </p>
+                <p className="text-[12px] text-[#777]">
+                  잔액 {tx.balance_after.toLocaleString()}P
+                </p>
+              </div>
+            </div>
+          ))}
 
           {myTransactions.length === 0 && (
             <p className="rounded-xl bg-[#f7f5f2] py-4 text-center text-[13px] text-[#777]">
