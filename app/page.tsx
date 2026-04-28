@@ -34,8 +34,9 @@ type PointTransaction = {
   member_id: string
   type: string
   amount: number
-  balance_after: number
+  description?: string | null
   memo?: string | null
+  balance_after?: number | null
   event_type?: string | null
   related_attendance_id?: string | null
   attend_date_snapshot?: string | null
@@ -124,6 +125,24 @@ function getPaymentStatusLabel(status?: string | null) {
   if (status === 'rejected') return '취소'
   return '확인대기'
 }
+function getPointTypeLabel(type?: string | null) {
+  if (type === 'charge') return '충전'
+  if (type === 'use') return '차감'
+  if (type === 'adjust') return '조정'
+  return '포인트'
+}
+
+function formatPointDate(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
 
 function isWeekendDate(dateString: string) {
   const [year, month, day] = dateString.split('-').map(Number)
@@ -1307,10 +1326,10 @@ function MyPage(props: {
   async function fetchMyTransactions() {
     const { data, error } = await supabase
       .from('point_transactions')
-      .select('*')
+      .select('id, member_id, type, amount, description, event_type, related_attendance_id, attend_date_snapshot, created_at')
       .eq('member_id', member.id)
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(30)
 
     if (!error && data) {
       setMyTransactions(data)
@@ -1401,32 +1420,56 @@ function MyPage(props: {
       </section>
 
       <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
-        <p className="text-[15px] font-bold">포인트 이용 내역</p>
+        <div className="flex items-center justify-between">
+          <p className="text-[15px] font-bold">포인트 이용 내역</p>
+          <button
+            onClick={fetchMyTransactions}
+            className="rounded-full bg-[#f1efec] px-3 py-2 text-[12px] font-bold text-[#555]"
+          >
+            새로고침
+          </button>
+        </div>
+
         <div className="mt-4 space-y-2">
-          {myTransactions.map((tx) => (
-            <div
-              key={tx.id}
-              className="flex items-center justify-between rounded-xl bg-[#f7f5f2] px-3 py-2 text-[13px]"
-            >
-              <div>
-                <p className="font-bold">
-                  {tx.type === 'charge' ? '충전' : tx.type === 'use' ? '차감' : '조정'}
-                </p>
-                <p className="text-[12px] text-[#777]">
-                  {tx.memo || '메모 없음'}
-                  {tx.attend_date_snapshot ? ` · ${tx.attend_date_snapshot}` : ''}
-                </p>
+          {myTransactions.map((tx) => {
+            const isPlus = tx.amount > 0
+            const description = tx.description || tx.memo || '메모 없음'
+
+            return (
+              <div
+                key={tx.id}
+                className="rounded-xl bg-[#f7f5f2] px-3 py-3 text-[13px]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-extrabold">
+                      {getPointTypeLabel(tx.type)}
+                      {tx.event_type ? ` · ${getEventTypeLabel(tx.event_type)}` : ''}
+                    </p>
+                    <p className="mt-1 text-[12px] font-semibold text-[#777]">
+                      {description}
+                    </p>
+                    <p className="mt-1 text-[12px] text-[#999]">
+                      {tx.attend_date_snapshot
+                        ? `${tx.attend_date_snapshot} 참석`
+                        : formatPointDate(tx.created_at)}
+                    </p>
+                  </div>
+
+                  <p
+                    className={
+                      isPlus
+                        ? 'shrink-0 text-[15px] font-extrabold text-[#1687bd]'
+                        : 'shrink-0 text-[15px] font-extrabold text-[#c85b70]'
+                    }
+                  >
+                    {isPlus ? '+' : ''}
+                    {tx.amount.toLocaleString()}P
+                  </p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="font-extrabold">
-                  {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}P
-                </p>
-                <p className="text-[12px] text-[#777]">
-                  잔액 {tx.balance_after.toLocaleString()}P
-                </p>
-              </div>
-            </div>
-          ))}
+            )
+          })}
 
           {myTransactions.length === 0 && (
             <p className="rounded-xl bg-[#f7f5f2] py-4 text-center text-[13px] text-[#777]">
