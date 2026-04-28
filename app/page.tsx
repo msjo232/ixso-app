@@ -143,6 +143,19 @@ function formatPointDate(value?: string | null) {
   })
 }
 
+function formatPointDateTime(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 
 function isWeekendDate(dateString: string) {
   const [year, month, day] = dateString.split('-').map(Number)
@@ -1295,6 +1308,99 @@ function SignupScreen(props: {
   )
 }
 
+function PointHistoryModal(props: {
+  isOpen: boolean
+  transactions: PointTransaction[]
+  onClose: () => void
+  onRefresh: () => void
+}) {
+  const { isOpen, transactions, onClose, onRefresh } = props
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-4 sm:items-center sm:pb-0">
+      <div className="max-h-[82vh] w-full max-w-[440px] overflow-hidden rounded-[28px] bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-[#eee8e3] px-5 py-4">
+          <div>
+            <p className="text-[20px] font-extrabold">포인트 이용 내역</p>
+            <p className="mt-1 text-[12px] font-semibold text-[#888]">
+              최근 포인트 충전/차감 기록입니다.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-full bg-[#f1efec] px-4 py-2 text-[13px] font-extrabold text-[#555]"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="max-h-[62vh] overflow-y-auto px-5 py-4">
+          <button
+            onClick={onRefresh}
+            className="mb-3 w-full rounded-2xl bg-[#f1efec] py-3 text-[13px] font-extrabold text-[#555]"
+          >
+            새로고침
+          </button>
+
+          <div className="space-y-2">
+            {transactions.map((tx) => {
+              const isPlus = tx.amount > 0
+              const description = tx.description || tx.memo || ''
+
+              return (
+                <div
+                  key={tx.id}
+                  className="rounded-xl bg-[#f7f5f2] px-3 py-3 text-[13px]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-extrabold">
+                        {getPointTypeLabel(tx.type)}
+                        {tx.event_type ? ` · ${getEventTypeLabel(tx.event_type)}` : ''}
+                      </p>
+
+                      {description && (
+                        <p className="mt-1 text-[12px] font-semibold text-[#777]">
+                          {description}
+                        </p>
+                      )}
+
+                      <p className="mt-1 text-[12px] text-[#999]">
+                        {tx.attend_date_snapshot
+                          ? `${tx.attend_date_snapshot} 참석 · ${formatPointDateTime(tx.created_at)}`
+                          : formatPointDateTime(tx.created_at)}
+                      </p>
+                    </div>
+
+                    <p
+                      className={
+                        isPlus
+                          ? 'shrink-0 text-[15px] font-extrabold text-[#1687bd]'
+                          : 'shrink-0 text-[15px] font-extrabold text-[#c85b70]'
+                      }
+                    >
+                      {isPlus ? '+' : ''}
+                      {tx.amount.toLocaleString()}P
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+
+            {transactions.length === 0 && (
+              <p className="rounded-xl bg-[#f7f5f2] py-8 text-center text-[13px] text-[#777]">
+                포인트 내역이 없습니다.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function MyPage(props: {
   member: Member
   setCurrentMember: (member: Member | null) => void
@@ -1304,6 +1410,7 @@ function MyPage(props: {
   const isAdmin = member.role === 'admin'
   const [myBalance, setMyBalance] = useState(0)
   const [myTransactions, setMyTransactions] = useState<PointTransaction[]>([])
+  const [isPointHistoryOpen, setIsPointHistoryOpen] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
   const [passwordChanging, setPasswordChanging] = useState(false)
@@ -1419,65 +1526,12 @@ function MyPage(props: {
         </button>
       </section>
 
-      <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <p className="text-[15px] font-bold">포인트 이용 내역</p>
-          <button
-            onClick={fetchMyTransactions}
-            className="rounded-full bg-[#f1efec] px-3 py-2 text-[12px] font-bold text-[#555]"
-          >
-            새로고침
-          </button>
-        </div>
-
-        <div className="mt-4 space-y-2">
-          {myTransactions.map((tx) => {
-            const isPlus = tx.amount > 0
-            const description = tx.description || tx.memo || '메모 없음'
-
-            return (
-              <div
-                key={tx.id}
-                className="rounded-xl bg-[#f7f5f2] px-3 py-3 text-[13px]"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-extrabold">
-                      {getPointTypeLabel(tx.type)}
-                      {tx.event_type ? ` · ${getEventTypeLabel(tx.event_type)}` : ''}
-                    </p>
-                    <p className="mt-1 text-[12px] font-semibold text-[#777]">
-                      {description}
-                    </p>
-                    <p className="mt-1 text-[12px] text-[#999]">
-                      {tx.attend_date_snapshot
-                        ? `${tx.attend_date_snapshot} 참석`
-                        : formatPointDate(tx.created_at)}
-                    </p>
-                  </div>
-
-                  <p
-                    className={
-                      isPlus
-                        ? 'shrink-0 text-[15px] font-extrabold text-[#1687bd]'
-                        : 'shrink-0 text-[15px] font-extrabold text-[#c85b70]'
-                    }
-                  >
-                    {isPlus ? '+' : ''}
-                    {tx.amount.toLocaleString()}P
-                  </p>
-                </div>
-              </div>
-            )
-          })}
-
-          {myTransactions.length === 0 && (
-            <p className="rounded-xl bg-[#f7f5f2] py-4 text-center text-[13px] text-[#777]">
-              포인트 내역이 없습니다.
-            </p>
-          )}
-        </div>
-      </section>
+      <PointHistoryModal
+        isOpen={isPointHistoryOpen}
+        transactions={myTransactions}
+        onClose={() => setIsPointHistoryOpen(false)}
+        onRefresh={fetchMyTransactions}
+      />
 
       <section className="rounded-[24px] border border-[#d7d0ca] bg-white p-5 shadow-sm">
         <p className="text-[15px] font-bold">비밀번호 변경</p>
